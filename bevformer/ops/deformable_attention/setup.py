@@ -7,11 +7,9 @@ from torch.utils.cpp_extension import CUDA_HOME
 from torch.utils.cpp_extension import CppExtension
 from torch.utils.cpp_extension import CUDAExtension
 
-from setuptools import find_packages
 from setuptools import setup
 
 requirements = ["torch", "torchvision"]
-
 
 def get_extensions():
     this_dir = os.path.dirname(os.path.abspath(__file__))
@@ -31,8 +29,10 @@ def get_extensions():
         sources += source_cuda
         define_macros += [("WITH_CUDA", None)]
         extra_compile_args["nvcc"] = [
-
-
+            "-DCUDA_HAS_FP16=1",
+            "-D__CUDA_NO_HALF_OPERATORS__",
+            "-D__CUDA_NO_HALF_CONVERSIONS__",
+            "-D__CUDA_NO_HALF2_OPERATORS__",
         ]
     else:
         raise NotImplementedError('Cuda is not availabel')
@@ -41,7 +41,7 @@ def get_extensions():
     include_dirs = [extensions_dir]
     ext_modules = [
         extension(
-            "DCNv3",
+            "MultiScaleDeformableAttention",
             sources,
             include_dirs=include_dirs,
             define_macros=define_macros,
@@ -50,18 +50,13 @@ def get_extensions():
     ]
     return ext_modules
 
-
 setup(
-    name="DCNv3",
-    version="1.1",
-    author="InternImage",
-    url="https://github.com/OpenGVLab/InternImage",
-    description=
-    "PyTorch Wrapper for CUDA Functions of DCNv3",
-    packages=find_packages(exclude=(
-        "configs",
-        "tests",
-    )),
+    name="MultiScaleDeformableAttention",
+    version="1.0",
+    author="Weijie Su",
+    url="https://github.com/fundamentalvision/Deformable-DETR",
+    description="PyTorch Wrapper for CUDA Functions of Multi-Scale Deformable Attention",
+    packages=[],
     ext_modules=get_extensions(),
     cmdclass={"build_ext": torch.utils.cpp_extension.BuildExtension},
 )

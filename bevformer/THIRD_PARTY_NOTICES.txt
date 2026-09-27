@@ -1,27 +1,27 @@
 Original third-party notices preserved from Python source headers.
 
-models_carla/models/__init__.py
+models/backbone/__init__.py
 --------------------------------------------------------
 InternImage
 Copyright (c) 2022 OpenGVLab
 Licensed under The MIT License [see LICENSE for details]
 --------------------------------------------------------
 
-models_carla/models/build.py
+models/backbone/build.py
 --------------------------------------------------------
 InternImage
 Copyright (c) 2022 OpenGVLab
 Licensed under The MIT License [see LICENSE for details]
 --------------------------------------------------------
 
-models_carla/models/intern_image.py
+models/backbone/internimage.py
 --------------------------------------------------------
 InternImage
 Copyright (c) 2022 OpenGVLab
 Licensed under The MIT License [see LICENSE for details]
 --------------------------------------------------------
 
-models_carla/ops/functions/__init__.py
+ops/deformable_attention/functions/__init__.py
 ------------------------------------------------------------------------------------------------
 Deformable DETR
 Copyright (c) 2020 SenseTime. All Rights Reserved.
@@ -30,7 +30,7 @@ Licensed under the Apache License, Version 2.0 [see LICENSE for details]
 Modified from https://github.com/chengdazhi/Deformable-Convolution-V2-PyTorch/tree/pytorch_1.0.0
 ------------------------------------------------------------------------------------------------
 
-models_carla/ops/functions/ms_deform_attn_func.py
+ops/deformable_attention/functions/ms_deform_attn_func.py
 ------------------------------------------------------------------------------------------------
 Deformable DETR
 Copyright (c) 2020 SenseTime. All Rights Reserved.
@@ -39,7 +39,7 @@ Licensed under the Apache License, Version 2.0 [see LICENSE for details]
 Modified from https://github.com/chengdazhi/Deformable-Convolution-V2-PyTorch/tree/pytorch_1.0.0
 ------------------------------------------------------------------------------------------------
 
-models_carla/ops/modules/ms_deform_attn.py
+ops/deformable_attention/modules/ms_deform_attn.py
 ------------------------------------------------------------------------------------------------
 Deformable DETR
 Copyright (c) 2020 SenseTime. All Rights Reserved.
@@ -48,7 +48,7 @@ Licensed under the Apache License, Version 2.0 [see LICENSE for details]
 Modified from https://github.com/chengdazhi/Deformable-Convolution-V2-PyTorch/tree/pytorch_1.0.0
 ------------------------------------------------------------------------------------------------
 
-models_carla/ops/setup.py
+ops/deformable_attention/setup.py
 ------------------------------------------------------------------------------------------------
 Deformable DETR
 Copyright (c) 2020 SenseTime. All Rights Reserved.
@@ -57,7 +57,7 @@ Licensed under the Apache License, Version 2.0 [see LICENSE for details]
 Modified from https://github.com/chengdazhi/Deformable-Convolution-V2-PyTorch/tree/pytorch_1.0.0
 ------------------------------------------------------------------------------------------------
 
-models_carla/ops/test.py
+ops/deformable_attention/test.py
 ------------------------------------------------------------------------------------------------
 Deformable DETR
 Copyright (c) 2020 SenseTime. All Rights Reserved.
@@ -66,49 +66,49 @@ Licensed under the Apache License, Version 2.0 [see LICENSE for details]
 Modified from https://github.com/chengdazhi/Deformable-Convolution-V2-PyTorch/tree/pytorch_1.0.0
 ------------------------------------------------------------------------------------------------
 
-configs/config.py
+configs/backbone.py
 --------------------------------------------------------
 InternImage
 Copyright (c) 2022 OpenGVLab
 Licensed under The MIT License [see LICENSE for details]
 --------------------------------------------------------
 
-ops_dcnv3/functions/__init__.py
+ops/dcnv3/functions/__init__.py
 --------------------------------------------------------
 InternImage
 Copyright (c) 2022 OpenGVLab
 Licensed under The MIT License [see LICENSE for details]
 --------------------------------------------------------
 
-ops_dcnv3/functions/dcnv3_func.py
+ops/dcnv3/functions/dcnv3_func.py
 --------------------------------------------------------
 InternImage
 Copyright (c) 2022 OpenGVLab
 Licensed under The MIT License [see LICENSE for details]
 --------------------------------------------------------
 
-ops_dcnv3/modules/__init__.py
+ops/dcnv3/modules/__init__.py
 --------------------------------------------------------
 InternImage
 Copyright (c) 2022 OpenGVLab
 Licensed under The MIT License [see LICENSE for details]
 --------------------------------------------------------
 
-ops_dcnv3/modules/dcnv3.py
+ops/dcnv3/modules/dcnv3.py
 --------------------------------------------------------
 InternImage
 Copyright (c) 2022 OpenGVLab
 Licensed under The MIT License [see LICENSE for details]
 --------------------------------------------------------
 
-ops_dcnv3/setup.py
+ops/dcnv3/setup.py
 --------------------------------------------------------
 InternImage
 Copyright (c) 2022 OpenGVLab
 Licensed under The MIT License [see LICENSE for details]
 --------------------------------------------------------
 
-ops_dcnv3/test.py
+ops/dcnv3/test.py
 --------------------------------------------------------
 InternImage
 Copyright (c) 2022 OpenGVLab

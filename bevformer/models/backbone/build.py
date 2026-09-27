@@ -1,7 +1,7 @@
-from .intern_image import InternImage
+from .internimage import InternImage
 
 
-def build_model(config,in_c=3):
+def build_backbone(config,in_c=3):
     model_type = config.MODEL.TYPE
     if model_type == 'intern_image':
         model = InternImage(

@@ -7,7 +7,7 @@ CARLA data collection and model training for autonomous driving.
 | Directory | Purpose | Status |
 | --- | --- | --- |
 | [data_gen](data_gen/README.md) | Collect camera images, BEV labels, and driving metadata in CARLA. | Included |
-| [bevformer](bevformer/README.md) | Train multi-camera BEV perception models. | Source included; additional setup required |
+| [bevformer](bevformer/README.md) | Train multi-camera BEV perception models. | Source included; data2.py required |
 | [TLCformer](TLCformer/README.md) | Train a temporal front-camera model for traffic-light GO/STOP state and distance bins. | Included |
 | `RL_Training/` | Train autonomous-driving policies with reinforcement learning. | Planned |
 

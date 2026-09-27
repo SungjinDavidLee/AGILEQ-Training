@@ -6,8 +6,8 @@ import torchvision
 from efficientnet_pytorch import EfficientNet
 
 import math
-from models_carla.ops.modules import MSDeformAttn, MSDeformAttn3D
-from models_carla.models import build_model
+from ops.deformable_attention.modules import MSDeformAttn, MSDeformAttn3D
+from .backbone import build_backbone as build_model
 
 scene_centroid_x = 0.0
 scene_centroid_y = 1.0
@@ -17,8 +17,8 @@ scene_centroid_py = np.array([scene_centroid_x,
                               scene_centroid_y,
                               scene_centroid_z]).reshape([1, 3])
 scene_centroid = torch.from_numpy(scene_centroid_py).float()
-XMIN, XMAX = -50, 50
-ZMIN, ZMAX = -50, 50
+XMIN, XMAX = -20, 20
+ZMIN, ZMAX = -20, 20
 YMIN, YMAX = -5, 5
 bounds = (XMIN, XMAX, YMIN, YMAX, ZMIN, ZMAX)
 EPS = 1e-6
@@ -263,7 +263,6 @@ class Vox_util(object):
 
     def Ref2Mem(self, xyz, Z, Y, X, assert_cube=False):
 
-
         B, N, C = list(xyz.shape)
         device = xyz.device
         assert(C==3)
@@ -272,7 +271,6 @@ class Vox_util(object):
         return xyz
 
     def Mem2Ref(self, xyz_mem, Z, Y, X, assert_cube=False):
-
 
         B, N, C = list(xyz_mem.shape)
         ref_T_mem = self.get_ref_T_mem(B, Z, Y, X, assert_cube=assert_cube, device=xyz_mem.device)
@@ -297,13 +295,10 @@ class Vox_util(object):
                 print('vox_size_Z', vox_size_Z)
             assert(np.isclose(vox_size_X, vox_size_Y))
             assert(np.isclose(vox_size_X, vox_size_Z))
-
-
         center_T_ref = eye_4x4(B, device=device)
         center_T_ref[:,0,3] = -self.XMIN-vox_size_X/2.0
         center_T_ref[:,1,3] = -self.YMIN-vox_size_Y/2.0
         center_T_ref[:,2,3] = -self.ZMIN-vox_size_Z/2.0
-
 
         mem_T_center = eye_4x4(B, device=device)
         mem_T_center[:,0,0] = 1./vox_size_X
@@ -315,13 +310,10 @@ class Vox_util(object):
 
     def get_ref_T_mem(self, B, Z, Y, X, assert_cube=False, device='cuda'):
         mem_T_ref = self.get_mem_T_ref(B, Z, Y, X, assert_cube=assert_cube, device=device)
-
-
         ref_T_mem = mem_T_ref.inverse()
         return ref_T_mem
 
     def get_inbounds(self, xyz, Z, Y, X, already_mem=False, padding=0.0, assert_cube=False):
-
 
         if not already_mem:
             xyz = self.Ref2Mem(xyz, Z, Y, X, assert_cube=assert_cube)
@@ -374,16 +366,13 @@ class Vox_util(object):
         mask[inbounds] = 1.0
 
         if xyz_zero is not None:
-
             dist = torch.norm(xyz_zero-xyz, dim=2)
             mask[dist < 0.1] = 0
 
         if clean_eps > 0:
-
             xyz_round = torch.round(xyz)
             dist = torch.norm(xyz_round - xyz, dim=2)
             mask[dist > clean_eps] = 0
-
 
         x = x*mask
         y = y*mask
@@ -410,15 +399,11 @@ class Vox_util(object):
         vox_inds = base + z * dim2 + y * dim3 + x
         voxels = torch.zeros(B*Z*Y*X, device=xyz.device).float()
         voxels[vox_inds.long()] = 1.0
-
         voxels[base.long()] = 0.0
         voxels = voxels.reshape(B, 1, Z, Y, X)
-
         return voxels
 
     def get_feat_occupancy(self, xyz, feat, Z, Y, X, clean_eps=0, xyz_zero=None):
-
-
         B, N, C = list(xyz.shape)
         B2, N2, D2 = list(feat.shape)
         assert(C==3)
@@ -430,16 +415,13 @@ class Vox_util(object):
         mask[inbounds] = 1.0
 
         if xyz_zero is not None:
-
             dist = torch.norm(xyz_zero-xyz, dim=2)
             mask[dist < 0.1] = 0
 
         if clean_eps > 0:
-
             xyz_round = torch.round(xyz)
             dist = torch.norm(xyz_round - xyz, dim=2)
             mask[dist > clean_eps] = 0
-
 
         x = x*mask
         y = y*mask
@@ -482,8 +464,6 @@ class Vox_util(object):
         return feat_voxels
 
     def unproject_image_to_mem(self, rgb_camB, pixB_T_camA, camB_T_camA, Z, Y, X, assert_cube=False, xyz_camA=None):
-
-
         B, C, H, W = list(rgb_camB.shape)
 
         if xyz_camA is None:
@@ -499,9 +479,7 @@ class Vox_util(object):
 
         xy_pixB = xyz_pixB[:,:,:2]/torch.clamp(normalizer, min=EPS)
 
-
         x, y = xy_pixB[:,:,0], xy_pixB[:,:,1]
-
 
         x_valid = (x>-0.5).bool() & (x<float(W-0.5)).bool()
         y_valid = (y>-0.5).bool() & (y<float(H-0.5)).bool()
@@ -523,7 +501,6 @@ class Vox_util(object):
 
     def warp_tiled_to_mem(self, rgb_tileB, pixB_T_camA, camB_T_camA, Z, Y, X, DMIN, DMAX, assert_cube=False):
 
-
         B, C, D, H, W = list(rgb_tileB.shape)
 
         xyz_memA = gridcloud3d(B, Z, Y, X, norm=False, device=pixB_T_camA.device)
@@ -533,7 +510,6 @@ class Vox_util(object):
         xyz_camB = apply_4x4(camB_T_camA, xyz_camA)
         z_camB = xyz_camB[:,:,2]
 
-
         z_tileB = (D-1.0) * (z_camB-float(DMIN)) / float(DMAX-DMIN)
 
         xyz_pixB = apply_4x4(pixB_T_camA, xyz_camA)
@@ -541,7 +517,6 @@ class Vox_util(object):
         EPS=1e-6
 
         xy_pixB = xyz_pixB[:,:,:2]/torch.clamp(normalizer, min=EPS)
-
 
         x, y = xy_pixB[:,:,0], xy_pixB[:,:,1]
 
@@ -563,13 +538,11 @@ class Vox_util(object):
 
     def apply_mem_T_ref_to_lrtlist(self, lrtlist_cam, Z, Y, X, assert_cube=False):
 
-
         B, N, C = list(lrtlist_cam.shape)
         assert(C==19)
         mem_T_cam = self.get_mem_T_ref(B, Z, Y, X, assert_cube=assert_cube, device=lrtlist_cam.device)
 
     def xyz2circles(self, xyz, radius, Z, Y, X, soft=True, already_mem=True, also_offset=False, grid=None):
-
 
         B, N, D = list(xyz.shape)
         assert(D==3)
@@ -584,7 +557,6 @@ class Vox_util(object):
 
         xyz = xyz.reshape(B, N, 3, 1, 1, 1)
         grid = grid.reshape(B, 1, 3, Z, Y, X)
-
 
         xyz = xyz.round()
 
@@ -601,7 +573,6 @@ class Vox_util(object):
             mask = torch.exp(-dist_grid/(2*radius*radius))
 
             mask[mask < 0.001] = 0.0
-
 
             if also_offset:
                 return mask, off
@@ -706,6 +677,20 @@ def GN(C, max_groups=32):
         if C % g == 0:
             return nn.GroupNorm(g, C)
     return nn.GroupNorm(1, C)
+def make_head_from100(in_ch: int = 64, mid_ch: int = 64, align_corners: bool = False):
+
+    return nn.Sequential(
+        nn.Upsample(scale_factor=2, mode='bilinear', align_corners=align_corners),
+        nn.Conv2d(in_ch, mid_ch, kernel_size=3, padding=1, bias=False),
+        GN(mid_ch),
+        nn.ReLU(inplace=True),
+
+        nn.Conv2d(mid_ch, mid_ch, kernel_size=3, padding=1, bias=False),
+        GN(mid_ch),
+        nn.ReLU(inplace=True),
+
+        nn.Conv2d(mid_ch, 1, kernel_size=1, padding=0),
+    )
 class Up(nn.Module):
     def __init__(self, in_channels, out_channels):
         super().__init__()
@@ -768,6 +753,18 @@ class BevEncode_effi_B0(nn.Module):
 
             nn.Conv2d(64, 1, kernel_size=1, padding=0),
         )
+
+        self.up1_lane2 = Up(64 + 64, 64)
+        self.up2_lane2 = nn.Sequential(
+            nn.Upsample(scale_factor=2, mode='bilinear',
+                        align_corners=True),
+            nn.Conv2d(64, 64, kernel_size=3, padding=1, bias=False),
+            GN(64),
+            nn.ReLU(inplace=True),
+
+            nn.Conv2d(64, 1, kernel_size=1, padding=0),
+        )
+
         self.up1_ped = Up(64 + 64, 64)
         self.up2_ped = nn.Sequential(
             nn.Upsample(scale_factor=2, mode='bilinear',
@@ -830,8 +827,11 @@ class BevEncode_effi_B0(nn.Module):
         road = self.up1_BEV(ups2, ups)
         road = self.up2_BEV(road)
 
-        lane = self.up1_lane(ups2, ups)
-        lane = self.up2_lane(lane)
+        lane_broken = self.up1_lane(ups2, ups)
+        lane_broken = self.up2_lane(lane_broken)
+
+        lane_solid = self.up1_lane2(ups2, ups)
+        lane_solid = self.up2_lane2(lane_solid)
 
         veh = self.up1_veh(ups2, ups)
         veh = self.up2_veh(veh)
@@ -843,58 +843,8 @@ class BevEncode_effi_B0(nn.Module):
         stop = self.up2_stop(stop)
 
 
-        return road, lane, veh, ped, stop
+        return road, lane_broken,lane_solid, veh, ped, stop
 
-class UpsamplingAdd(nn.Module):
-    def __init__(self, in_channels, out_channels, scale_factor=2):
-        super().__init__()
-        self.upsample_layer = nn.Sequential(
-            nn.Upsample(scale_factor=scale_factor, mode='bilinear', align_corners=False),
-            nn.Conv2d(in_channels, out_channels, kernel_size=1, padding=0, bias=False),
-            nn.InstanceNorm2d(out_channels),
-        )
-
-    def forward(self, x, x_skip):
-        x = self.upsample_layer(x)
-        return x + x_skip
-class UpsamplingConcat(nn.Module):
-    def __init__(self, in_channels, out_channels, scale_factor=2):
-        super().__init__()
-
-        self.upsample = nn.Upsample(scale_factor=scale_factor, mode='bilinear', align_corners=False)
-
-        self.conv = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1, bias=False),
-            nn.InstanceNorm2d(out_channels),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1, bias=False),
-            nn.InstanceNorm2d(out_channels),
-            nn.ReLU(inplace=True),
-        )
-
-    def forward(self, x_to_upsample, x):
-        x_to_upsample = self.upsample(x_to_upsample)
-        x_to_upsample = torch.cat([x, x_to_upsample], dim=1)
-        return self.conv(x_to_upsample)
-
-class Encoder_res50(nn.Module):
-    def __init__(self, C):
-        super().__init__()
-        self.C = C
-        resnet = torchvision.models.resnet50(pretrained=True)
-        self.backbone = nn.Sequential(*list(resnet.children())[:-4])
-        self.layer3 = resnet.layer3
-
-        self.depth_layer = nn.Conv2d(512, self.C, kernel_size=1, padding=0)
-        self.upsampling_layer = UpsamplingConcat(1536, 512)
-
-    def forward(self, x):
-        x1 = self.backbone(x)
-        x2 = self.layer3(x1)
-        x = self.upsampling_layer(x2, x1)
-        x = self.depth_layer(x)
-
-        return x
 class FPN(nn.Module):
     def __init__(self, in_channels=[128, 256, 512], out_channels=256):
         super().__init__()
@@ -944,15 +894,12 @@ class VanillaSelfAttention(nn.Module):
         self.deformable_attention = MSDeformAttn(d_model=dim, n_levels=1, n_heads=4, n_points=8)
         self.output_proj = nn.Linear(dim, dim)
 
-    def forward(self, query,history_queries=None, query_pos=None):
+    def forward(self, query, query_pos=None):
 
         inp_residual = query.clone()
 
         if query_pos is not None:
             query = query + query_pos
-
-        if history_queries is None:
-            history_queries = query.clone()
 
         B, N, C = query.shape
         device = query.device
@@ -970,7 +917,7 @@ class VanillaSelfAttention(nn.Module):
         input_spatial_shapes = query.new_zeros([1,2]).long()
         input_spatial_shapes[:] = 200
         input_level_start_index = query.new_zeros([1,]).long()
-        queries = self.deformable_attention(query, reference_points, history_queries,
+        queries = self.deformable_attention(query, reference_points, query.clone(),
             input_spatial_shapes, input_level_start_index)
 
         queries = self.output_proj(queries)
@@ -1040,9 +987,9 @@ class SpatialCrossAttention(nn.Module):
         return self.dropout(slots) + inp_residual
 
 
-class bevformer(nn.Module):
+class BEVFormer(nn.Module):
     def __init__(self, data_conf,):
-        super(bevformer, self).__init__()
+        super(BEVFormer, self).__init__()
         self.data_conf = data_conf
 
         self.feat2d_dim = feat2d_dim = latent_dim = 256
@@ -1085,8 +1032,8 @@ class bevformer(nn.Module):
         self.norm3_layers = nn.ModuleList([
             nn.LayerNorm(latent_dim) for _ in range(num_layers)
         ])
-    def history(self, bev_imgs,cam_pam):
 
+    def forward(self, bev_imgs,cam_pam):
         B, N, C, H, W = bev_imgs.shape
         __p = lambda x: pack_seqdim(x, B)
         __u = lambda x: unpack_seqdim(x, B)
@@ -1096,14 +1043,18 @@ class bevformer(nn.Module):
         pix_T_cams_ = merge_intrinsics(*split_intrinsics(intrins_)).cuda()
         pix_T_cams = __u(pix_T_cams_)
 
-        velo_T_cams = merge_rtlist(cam_pam['rots'], cam_pam['trans']).cuda()
-        cam0_T_camXs = get_camM_T_camXs(velo_T_cams, ind=0)
+        ego_T_camXs = merge_rtlist(
+            cam_pam['rots'],
+            cam_pam['trans']
+        ).cuda()
 
         bev_imgs = __p(bev_imgs)
 
         pix_T_cams_ = __p(pix_T_cams)
-        cam0_T_camXs_ = __p(cam0_T_camXs)
-        camXs_T_cam0_ = safe_inverse(cam0_T_camXs_)
+
+
+        ego_T_camXs_ = __p(ego_T_camXs)
+        camXs_T_ego_ = safe_inverse(ego_T_camXs_)
         feat_flatten = []
         spatial_shapes = []
 
@@ -1113,9 +1064,7 @@ class bevformer(nn.Module):
 
             feat = feat.view(B, N, C, Hf, Wf)
             spatial_shapes.append([Hf, Wf])
-
             feat = feat.reshape(B, N, C, Hf*Wf).permute(1, 3, 0, 2)
-
             feat_flatten.append(feat)
 
         bev_keys = torch.cat(feat_flatten, 1)
@@ -1130,14 +1079,25 @@ class bevformer(nn.Module):
 
         bev_queries = self.bev_queries.clone().unsqueeze(0).repeat(B,1,1,1).reshape(B, self.feat2d_dim, -1).permute(0,2,1)
 
+
         bev_queries_pos = self.bev_queries_pos.clone().unsqueeze(0).repeat(B,1,1,1).reshape(B, self.feat2d_dim, -1).permute(0,2,1)
 
+        xyz_mem_ = gridcloud3d(B * N, Z, Y, X, norm=False, device=bev_imgs.device)
 
-        xyz_mem_ = gridcloud3d(B*N, Z, Y, X, norm=False, device=bev_imgs.device)
-        xyz_cam0_ = self.vox_util.Mem2Ref(xyz_mem_, Z, Y, X, assert_cube=False)
-        xyz_camXs_ = apply_4x4(camXs_T_cam0_, xyz_cam0_)
+
+        xyz_ego_ = self.vox_util.Mem2Ref(
+            xyz_mem_,
+            Z,
+            Y,
+            X,
+            assert_cube=False
+        )
+
+
+        xyz_camXs_ = apply_4x4(camXs_T_ego_, xyz_ego_)
+
+
         xy_camXs_ = camera2pixels(xyz_camXs_, pix_T_cams_)
-
         reference_points_cam = xy_camXs_.reshape(B, N, Z, Y, X, 2).permute(1, 0, 2, 4, 3, 5).reshape(N, B, Z*X, Y, 2)
         reference_points_cam[..., 0:1] = reference_points_cam[..., 0:1] / float(W)
         reference_points_cam[..., 1:2] = reference_points_cam[..., 1:2] / float(H)
@@ -1163,95 +1123,9 @@ class bevformer(nn.Module):
             bev_queries = bev_queries + self.ffn_layers[i](bev_queries)
             bev_queries = self.norm3_layers[i](bev_queries)
 
-
-        bev = bev_queries.permute(0, 2, 1).reshape(B, self.feat2d_dim, Z, X).contiguous()
-
-        return bev
-
-
-    def forward(self, bev_imgs,history_queries,cam_pam):
-
-        B, N, C, H, W = bev_imgs.shape
-        __p = lambda x: pack_seqdim(x, B)
-        __u = lambda x: unpack_seqdim(x, B)
-
-
-        intrins_ = __p(cam_pam['intrins'])
-        pix_T_cams_ = merge_intrinsics(*split_intrinsics(intrins_)).cuda()
-        pix_T_cams = __u(pix_T_cams_)
-
-        velo_T_cams = merge_rtlist(cam_pam['rots'], cam_pam['trans']).cuda()
-        cam0_T_camXs = get_camM_T_camXs(velo_T_cams, ind=0)
-
-        bev_imgs = __p(bev_imgs)
-
-        pix_T_cams_ = __p(pix_T_cams)
-        cam0_T_camXs_ = __p(cam0_T_camXs)
-        camXs_T_cam0_ = safe_inverse(cam0_T_camXs_)
-        feat_flatten = []
-        spatial_shapes = []
-
-        mlvl_feats = self.encoder(bev_imgs)
-        for lvl, feat in enumerate(mlvl_feats):
-            BN, C, Hf, Wf = feat.shape
-
-            feat = feat.view(B, N, C, Hf, Wf)
-            spatial_shapes.append([Hf, Wf])
-
-            feat = feat.reshape(B, N, C, Hf*Wf).permute(1, 3, 0, 2)
-
-            feat_flatten.append(feat)
-
-        bev_keys = torch.cat(feat_flatten, 1)
-
-        spatial_shapes = torch.as_tensor(spatial_shapes, dtype=torch.long, device=bev_keys.device)
-
-        level_start_index = torch.cat((
-            spatial_shapes.new_zeros((1,)),
-            spatial_shapes.prod(1).cumsum(0)[:-1]
-        ))
-
-
-        bev_queries = self.bev_queries.clone().unsqueeze(0).repeat(B,1,1,1).reshape(B, self.feat2d_dim, -1).permute(0,2,1)
-
-
-        bev_queries_pos = self.bev_queries_pos.clone().unsqueeze(0).repeat(B,1,1,1).reshape(B, self.feat2d_dim, -1).permute(0,2,1)
-
-
-        xyz_mem_ = gridcloud3d(B*N, Z, Y, X, norm=False, device=bev_imgs.device)
-        xyz_cam0_ = self.vox_util.Mem2Ref(xyz_mem_, Z, Y, X, assert_cube=False)
-        xyz_camXs_ = apply_4x4(camXs_T_cam0_, xyz_cam0_)
-        xy_camXs_ = camera2pixels(xyz_camXs_, pix_T_cams_)
-
-        reference_points_cam = xy_camXs_.reshape(B, N, Z, Y, X, 2).permute(1, 0, 2, 4, 3, 5).reshape(N, B, Z*X, Y, 2)
-        reference_points_cam[..., 0:1] = reference_points_cam[..., 0:1] / float(W)
-        reference_points_cam[..., 1:2] = reference_points_cam[..., 1:2] / float(H)
-
-
-        bev_mask = ((reference_points_cam[..., 1:2] > 0.0)
-                    & (reference_points_cam[..., 1:2] < 1.0)
-                    & (reference_points_cam[..., 0:1] < 1.0)
-                    & (reference_points_cam[..., 0:1] > 0.0)).squeeze(-1)
-
-
-        history_queries = history_queries.reshape(B, self.feat2d_dim, Z * X).permute(0, 2, 1).contiguous()
-
-        for i in range(self.num_layers):
-            bev_queries = self.self_attn_layers[i](bev_queries,history_queries, bev_queries_pos)
-            bev_queries = self.norm1_layers[i](bev_queries)
-
-            bev_queries = self.cross_attn_layers[i](bev_queries, bev_keys, bev_keys,
-                level_start_index=level_start_index,
-                query_pos=bev_queries_pos,
-                reference_points_cam = reference_points_cam,
-                spatial_shapes = spatial_shapes,
-                bev_mask = bev_mask)
-            bev_queries = self.norm2_layers[i](bev_queries)
-            bev_queries = bev_queries + self.ffn_layers[i](bev_queries)
-            bev_queries = self.norm3_layers[i](bev_queries)
-
         feat_bev = bev_queries.permute(0, 2, 1).reshape(B, self.feat2d_dim, Z, X).contiguous()
 
-        road, lane, veh, ped, stop=self.decoder(feat_bev)
 
-        return road, lane, veh, ped, stop
+        road, lane_broken,lane_solid, veh, ped, stop=self.decoder(feat_bev)
+
+        return road, lane_broken,lane_solid, veh, ped, stop

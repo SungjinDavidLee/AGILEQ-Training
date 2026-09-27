@@ -8,7 +8,7 @@ import torch.nn as nn
 import math
 from torch.autograd import gradcheck
 
-from functions.dcnv3_func import DCNv3Function, dcnv3_core_pytorch
+from .functions.dcnv3_func import DCNv3Function, dcnv3_core_pytorch
 
 H_in, W_in = 8, 8
 N, M, D = 2, 4, 16

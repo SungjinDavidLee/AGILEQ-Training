@@ -1,57 +1,99 @@
-# BEVFormer training
+# BEVFormer
 
 [한국어](README_ko.md)
 
-Multi-camera BEV perception training source. The default training entry point imports `models_carla/bevformer.py`; additional model variants are retained from the supplied archive.
+One BEVFormer model and one training entry point, replaced with the latest supplied model and DDP training code. The model returns six BEV logits: road, broken lane, solid lane, vehicle, pedestrian, and stop line.
 
-| File or directory | Purpose |
+## Structure
+
+| Path | Purpose |
 | --- | --- |
-| `train.py` | Training, validation, checkpointing, and W&B logging |
-| `data.py` | Six-camera CARLA dataset, camera geometry, BEV targets, and LiDAR loading |
-| `models_carla/bevformer.py` | Default BEV perception model |
-| `models_carla/` | Additional supplied model variants |
-| `models_carla/models/` | InternImage backbone and model builder |
-| `models_carla/ops/` | Multi-scale deformable-attention Python bindings and C++/CUDA source |
-| `configs/` | InternImage configuration factories and YAML presets |
-| `ops_dcnv3/` | DCNv3 Python bindings, installation script, and C++/CUDA source |
+| `models/bevformer.py` | The single `BEVFormer` implementation, including geometry, encoder, attention, and six-head decoder |
+| `models/backbone/` | InternImage backbone implementation and builder |
+| `train.py` | Single-GPU/DDP training, validation, per-town metrics, and checkpoints |
+| `configs/backbone.py` | `load_backbone_config()` and InternImage defaults |
+| `configs/internimage_t_1k_224.yaml` | The active InternImage-T preset |
+| `ops/dcnv3/` | DCNv3 wrappers and C++/CUDA extension |
+| `ops/deformable_attention/` | Deformable-attention wrappers and C++/CUDA extension |
+| `data.py` | Previous dataset loader, retained for reference; not used by the new trainer |
 
-## Setup status
+The old `models_carla` and `ops_dcnv3` directories, alternative BEV models, duplicate model files, unrelated traffic/RL models, and unused configuration presets have been removed. Previous versions remain in Git history.
 
-The configuration and DCNv3 sources are included. Prepare the runtime environment before training:
+## Required dataset file
 
-- `train.py` imports `get_config_b` and `get_config_t` from the included `configs/config.py`. Their InternImage B/T YAML presets are in `configs/`. Run from `bevformer/` because these YAML paths are relative to the working directory. The root `config.py` is a different configuration file.
-- The InternImage backbone imports the included `ops_dcnv3` package. Its native `DCNv3` extension must be built and installed for your environment.
-- The default model includes CUDA-specific operations. Install mutually compatible PyTorch, torchvision, CUDA toolkit, and compiler versions. The archive does not pin a complete working environment.
-- Python dependencies include NumPy, OpenCV, PyYAML, yacs, pyquaternion, tqdm, segmentation-models-pytorch, efficientnet-pytorch, timm, and wandb. The DCNv3 wrapper also uses `pkg_resources` from a compatible setuptools release. Some alternative modules require additional dependencies.
+**The new trainer requires `data2.py`, which was not included in the supplied files. Training cannot start until it is provided.** Its expected interface is:
 
-Prebuilt Linux extensions for Python 3.7/3.9, object files, build metadata, eggs, and Python caches are excluded. After installing compatible PyTorch, CUDA, compiler, setuptools, and wheel dependencies, build and install both extensions from `bevformer/`:
+```python
+from data2 import Drive_Dataset
 
-```bash
-python -m pip install yacs
-python -m pip install --no-build-isolation ./ops_dcnv3
-python -m pip install --no-build-isolation ./models_carla/ops
+train_set = Drive_Dataset(train=True, conf=conf, v=2)
+val_set = Drive_Dataset(train=False, conf=conf, v=2)
 ```
 
-DCNv3 must be installed, not only compiled in place: the wrapper imports the top-level `DCNv3` extension and reads its installed package version. The supplied build scripts require a CUDA-enabled PyTorch environment with an available GPU and CUDA toolkit.
+Each sample must provide, in order:
 
-After preparing the environment and dataset, the training entry point is:
+```text
+bev_imgs, cam_pam, road_gt, lane_broken_gt, lane_solid_gt,
+veh_gt, ped_gt, stop_gt, town_idx, town_name
+```
+
+`cam_pam` supplies `intrins`, `rots`, and `trans`. Batched images have shape `[B,N,3,H,W]`. The trainer aggregates town indices in the order `Town01`, `Town02`, `Town03`, `Town04`, `Town05`, `Town10HD`.
+
+The previous `data.py` has a different constructor and return contract, including a single lane target. It is not silently substituted for `data2.py`. Separate broken/solid lane ground truth must come from the actual dataset; it cannot be inferred from a merged lane mask without additional information.
+
+## Environment
+
+Run from `bevformer/`. Install compatible PyTorch, torchvision, CUDA toolkit, a C++ compiler, setuptools, and wheel first. The inherited code does not specify a complete pinned environment.
+
+```bash
+python -m pip install numpy opencv-python PyYAML yacs pyquaternion tqdm segmentation-models-pytorch efficientnet-pytorch timm wandb
+python -m pip install --no-build-isolation ./ops/dcnv3
+python -m pip install --no-build-isolation ./ops/deformable_attention
+```
+
+The DCNv3 wrapper uses `pkg_resources`, so setuptools must provide it. Both extension build scripts require CUDA-enabled PyTorch, an available GPU, and the CUDA toolkit. Install DCNv3 rather than only compiling it in place: the wrapper reads its installed package version. The extension installers do not install conflicting top-level `functions` or `modules` packages; wrappers are loaded from this repository's `ops` package.
+
+Place the original InternImage-T checkpoint at `bevformer/internimage_t_1k_224.pth`, with weights under its `model` key. The decoder uses `EfficientNet.from_pretrained("efficientnet-b0")`, which may download weights. These pretrained files are not included.
+
+## Training
+
+After supplying `data2.py` and preparing its dataset:
 
 ```bash
 python train.py --wandb_mode disabled
+python train.py --wandb_mode disabled --resume
+torchrun --standalone --nproc_per_node=2 train.py --wandb_mode disabled
 ```
 
-The current source still imports `wandb` even in disabled mode. It also assigns the placeholder `???` to `WANDB_API_KEY` and contains existing project/entity defaults; configure these before using online logging. This upload removes comments and docstrings without changing training behavior.
+`--batch_size` is per GPU. The supplied trainer keeps its gradient accumulation, resume behavior, six-target losses, and per-town validation. Output defaults to `run_422/bev_<v>`.
 
-## Dataset
+W&B is still an import dependency in disabled mode. The supplied trainer assigns `?` to `WANDB_API_KEY` and retains project/entity defaults. Remove that placeholder assignment and configure your own credentials and account settings before online logging.
 
-Run from this directory. `data.py` looks under `data/train/Town01` through `Town05` and the corresponding `data/val` directories. It loads `data/sensor_config.yaml` and uses these camera prefixes:
+Backbone YAML paths resolve relative to `configs/backbone.py`. Dataset, checkpoint, and run paths still resolve from the working directory.
 
-`left_cam`, `front_cam`, `right_cam`, `rear_left_cam`, `rear_cam`, `rear_right_cam`.
+## Model and compatibility
 
-Camera images use `<camera>_rgb` directories. The loader also reads BEV labels, metadata, and LiDAR files; inspect `data.py` for the complete contract before collecting a training dataset. Keep training and validation scenes separate.
+The supplied model uses InternImage-T, six attention layers, an EfficientNet-B0 decoder, and GroupNorm in the added decoder blocks. Its BEV grid is 200 × 200 with eight vertical samples, horizontal bounds of -20 to 20 m, and scene centroid `(0, 1, 0)`. These settings and the six-output order are preserved. The 40 m horizontal extent matches the collector's nominal extent; camera calibration and coordinate conventions still require dataset validation.
 
-Do not assume the `data_gen` output is already fully aligned with this archive. Its default sensor names must match the loader, LiDAR must be collected if required, and the model's hard-coded spatial bounds must be reconciled with the collector's 40 m by 40 m BEV extent. The default model currently uses horizontal bounds of -50 to 50 m.
+```python
+from configs import load_backbone_config
+from models import BEVFormer
+
+model = BEVFormer({"config": load_backbone_config()}).cuda()
+road, lane_broken, lane_solid, vehicle, pedestrian, stopline = model(images, camera_parameters)
+```
+
+The new class name and module paths do not change the latest supplied model's parameter attribute names. Its `state_dict` layout is preserved. Old five-output/BatchNorm checkpoints are not assumed compatible with this six-output/GroupNorm model. Full pickled objects referring to old module paths require migration.
 
 ## Verification
 
-Python syntax and executable AST equivalence after comment/docstring removal were checked during repository preparation, including the added configuration and DCNv3 Python sources. Both configuration factories and their referenced YAML files are present. CUDA extension builds and actual model training were not run. Original Python copyright and license headers are preserved in `THIRD_PARTY_NOTICES.txt`; C++/CUDA source notices remain in place.
+Python syntax, retained computation ASTs against the two supplied files, and the relocated local import paths were checked. `data2.py` remains the known missing local dependency. C++/CUDA source is unchanged. CUDA extension builds and full model training were not run.
+
+After installing the extensions, run their original checks from this directory:
+
+```bash
+python -m ops.dcnv3.test
+python -m ops.deformable_attention.test
+```
+
+Python comments and docstrings are omitted. Third-party Python notices are preserved in `THIRD_PARTY_NOTICES.txt`; C++/CUDA notices remain in place.

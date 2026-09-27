@@ -1,12 +1,16 @@
 # AGILEQ-Training
 
-CARLA 기반 자율주행 데이터 생성 및 모델 학습을 위한 저장소입니다.
+[한국어](README_ko.md)
 
-| 폴더 | 설명 | 상태 |
+CARLA data collection and model training for autonomous driving.
+
+| Directory | Purpose | Status |
 | --- | --- | --- |
-| `data_gen/` | CARLA에서 카메라 이미지, BEV 정답 및 주행 정보를 수집합니다. | 포함 |
-| `bevformer/` | 다중 카메라 이미지를 이용한 BEV 공간 인지 모델을 학습합니다. | 추가 예정 |
-| `TLCformer/` | 신호등 인식 모델을 학습합니다. | 추가 예정 |
-| `RL_Training/` | 강화학습 기반 자율주행 정책을 학습합니다. | 추가 예정 |
+| [data_gen](data_gen/README.md) | Collect camera images, BEV labels, and driving metadata in CARLA. | Included |
+| [bevformer](bevformer/README.md) | Train multi-camera BEV perception models. | Source included; additional setup required |
+| [TLCformer](TLCformer/README.md) | Train a temporal front-camera model for traffic-light GO/STOP state and distance bins. | Included |
+| `RL_Training/` | Train autonomous-driving policies with reinforcement learning. | Planned |
 
-데이터 생성 설정과 실행 방법은 [data_gen/README.md](data_gen/README.md)를 참고하세요.
+Each module has its own setup and data requirements. Run its commands from that module's directory. See the module READMEs before connecting generated data to training: camera names, labels, and spatial conventions must agree.
+
+English is the default documentation language; Korean documentation uses `README_ko.md`. Python comments and docstrings have been removed. Third-party Python header notices are preserved in the corresponding `THIRD_PARTY_NOTICES.txt` files. Generated Python caches and platform-specific BEVFormer build artifacts are excluded; extension sources are included.

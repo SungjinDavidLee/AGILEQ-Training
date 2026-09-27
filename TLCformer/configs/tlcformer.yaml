@@ -1,0 +1,40 @@
+model:
+  embed_dim: 256
+  num_heads: 8
+  num_sampling_points: 8
+  num_queries: 2
+  arcface_centers: 20
+  arcface_scale: 20.0
+  arcface_margin: 0.5
+  dropout: 0.1
+  pretrained_backbone: true
+
+data:
+  root: data
+  train_split: train
+  val_split: val
+  scene_glob: Town*/scene_*
+  image_dir: front_cam_pv_rgb
+  label_dir: info
+  sequence_length: 10
+  sample_stride: 1
+  skip_first: 10
+  image_height: 512
+  image_width: 960
+  light_key: traffic_light_20
+  distance_key: traffic_light_distance
+
+train:
+  output_dir: runs/tlcformer
+  epochs: 50
+  batch_size: 8
+  num_workers: 8
+  learning_rate: 0.0001
+  weight_decay: 0.01
+  scheduler_step_size: 12
+  scheduler_gamma: 0.4
+  max_grad_norm: 5.0
+  light_loss_weight: 1.0
+  distance_loss_weight: 1.0
+  device: auto
+  seed: 42

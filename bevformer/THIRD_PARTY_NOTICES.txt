@@ -1,0 +1,67 @@
+Original third-party notices preserved from Python source headers.
+
+models_carla/models/__init__.py
+--------------------------------------------------------
+InternImage
+Copyright (c) 2022 OpenGVLab
+Licensed under The MIT License [see LICENSE for details]
+--------------------------------------------------------
+
+models_carla/models/build.py
+--------------------------------------------------------
+InternImage
+Copyright (c) 2022 OpenGVLab
+Licensed under The MIT License [see LICENSE for details]
+--------------------------------------------------------
+
+models_carla/models/intern_image.py
+--------------------------------------------------------
+InternImage
+Copyright (c) 2022 OpenGVLab
+Licensed under The MIT License [see LICENSE for details]
+--------------------------------------------------------
+
+models_carla/ops/functions/__init__.py
+------------------------------------------------------------------------------------------------
+Deformable DETR
+Copyright (c) 2020 SenseTime. All Rights Reserved.
+Licensed under the Apache License, Version 2.0 [see LICENSE for details]
+------------------------------------------------------------------------------------------------
+Modified from https://github.com/chengdazhi/Deformable-Convolution-V2-PyTorch/tree/pytorch_1.0.0
+------------------------------------------------------------------------------------------------
+
+models_carla/ops/functions/ms_deform_attn_func.py
+------------------------------------------------------------------------------------------------
+Deformable DETR
+Copyright (c) 2020 SenseTime. All Rights Reserved.
+Licensed under the Apache License, Version 2.0 [see LICENSE for details]
+------------------------------------------------------------------------------------------------
+Modified from https://github.com/chengdazhi/Deformable-Convolution-V2-PyTorch/tree/pytorch_1.0.0
+------------------------------------------------------------------------------------------------
+
+models_carla/ops/modules/ms_deform_attn.py
+------------------------------------------------------------------------------------------------
+Deformable DETR
+Copyright (c) 2020 SenseTime. All Rights Reserved.
+Licensed under the Apache License, Version 2.0 [see LICENSE for details]
+------------------------------------------------------------------------------------------------
+Modified from https://github.com/chengdazhi/Deformable-Convolution-V2-PyTorch/tree/pytorch_1.0.0
+------------------------------------------------------------------------------------------------
+
+models_carla/ops/setup.py
+------------------------------------------------------------------------------------------------
+Deformable DETR
+Copyright (c) 2020 SenseTime. All Rights Reserved.
+Licensed under the Apache License, Version 2.0 [see LICENSE for details]
+------------------------------------------------------------------------------------------------
+Modified from https://github.com/chengdazhi/Deformable-Convolution-V2-PyTorch/tree/pytorch_1.0.0
+------------------------------------------------------------------------------------------------
+
+models_carla/ops/test.py
+------------------------------------------------------------------------------------------------
+Deformable DETR
+Copyright (c) 2020 SenseTime. All Rights Reserved.
+Licensed under the Apache License, Version 2.0 [see LICENSE for details]
+------------------------------------------------------------------------------------------------
+Modified from https://github.com/chengdazhi/Deformable-Convolution-V2-PyTorch/tree/pytorch_1.0.0
+------------------------------------------------------------------------------------------------

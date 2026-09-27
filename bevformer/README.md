@@ -15,14 +15,14 @@ One BEVFormer model and one training entry point, replaced with the latest suppl
 | `configs/internimage_t_1k_224.yaml` | The active InternImage-T preset |
 | `ops/dcnv3/` | DCNv3 wrappers and C++/CUDA extension |
 | `ops/deformable_attention/` | Deformable-attention wrappers and C++/CUDA extension |
-| `data.py` | Previous dataset loader, retained for reference; not used by the new trainer |
+| `data.py` | Active six-camera dataset loader with six BEV targets and town metadata |
 
-## Required dataset file
+## Dataset
 
-**The new trainer requires `data2.py`, which was not included in the supplied files. Training cannot start until it is provided.** Its expected interface is:
+The supplied dataset loader is included as `data.py` and used directly by the trainer:
 
 ```python
-from data2 import Drive_Dataset
+from data import Drive_Dataset
 
 train_set = Drive_Dataset(train=True, conf=conf, v=2)
 val_set = Drive_Dataset(train=False, conf=conf, v=2)
@@ -35,9 +35,13 @@ bev_imgs, cam_pam, road_gt, lane_broken_gt, lane_solid_gt,
 veh_gt, ped_gt, stop_gt, town_idx, town_name
 ```
 
-`cam_pam` supplies `intrins`, `rots`, and `trans`. Batched images have shape `[B,N,3,H,W]`. The trainer aggregates town indices in the order `Town01`, `Town02`, `Town03`, `Town04`, `Town05`, `Town10HD`.
+`cam_pam` supplies `intrins`, `rots`, and `trans`. Batched images have shape `[B,N,3,H,W]`. The trainer imports `TOWNS` from `data.py`, using the same index order: `Town01`, `Town02`, `Town03`, `Town04`, `Town05`.
 
-The previous `data.py` has a different constructor and return contract, including a single lane target. It is not silently substituted for `data2.py`. Separate broken/solid lane ground truth must come from the actual dataset; it cannot be inferred from a merged lane mask without additional information.
+The loader reads `data/train/Town01` through `Town05` and the corresponding `data/val` directories, plus `data/sensor_config.yaml`. It skips the first five sorted files in each scene. Camera order is `right_cam`, `front_cam`, `left_cam`, `rear_right_cam`, `rear_cam`, `rear_left_cam`, with images under `<camera>_rgb`.
+
+The required BEV label directories are `das`, `lane_broken`, `solid`, `vehicle_mask`, `walker_mask`, and `stopline`. The solid-lane folder is named `solid`, not `lane_solid`. White pixels with value 255 become positive labels. Training uses shared color augmentation across the six cameras; validation does not. The current sample path does not call `get_lidar()`, so LiDAR files are not required for these samples.
+
+Separate broken/solid lane ground truth must be supplied; the collector's merged `lane` mask is not automatically split by this loader. Keep training and validation scenes separate.
 
 ## Environment
 
@@ -55,7 +59,7 @@ Place the original InternImage-T checkpoint at `bevformer/internimage_t_1k_224.p
 
 ## Training
 
-After supplying `data2.py` and preparing its dataset:
+After preparing the dataset and runtime environment:
 
 ```bash
 python train.py --wandb_mode disabled
@@ -85,7 +89,7 @@ The new class name and module paths do not change the latest supplied model's pa
 
 ## Verification
 
-Python syntax, retained computation ASTs against the two supplied files, and the relocated local import paths were checked. `data2.py` remains the known missing local dependency. C++/CUDA source is unchanged. CUDA extension builds and full model training were not run.
+Python syntax, the supplied dataset code's AST after comment/docstring removal, the ten-field sample return contract, and the trainer's data import and shared town list were checked. The supplied model/trainer integration was previously checked against its source. CUDA extension builds, real dataset loading, and full model training were not run for this update.
 
 After installing the extensions, run their original checks from this directory:
 

@@ -4,57 +4,13 @@ from torch.utils.data import Dataset
 import numpy as np
 import cv2
 import torchvision.transforms as T
-import json
 import os
 from pyquaternion import Quaternion
 import yaml
 import torchvision
 import numpy as np
-import math
-import random
-
-def bezier_cubic(P0, P1, P2, P3, t):
-
-    t = t[:, None]
-    B = (1-t)**3*P0 + 3*(1-t)**2*t*P1 + 3*(1-t)*t**2*P2 + t**3*P3
-    return B
-
-def path_curvature_xy(path_xy, eps=1e-6):
-
-    d1 = np.gradient(path_xy, axis=0)
-    d2 = np.gradient(d1, axis=0)
-    num = d1[:,0]*d2[:,1] - d1[:,1]*d2[:,0]
-    den = (d1[:,0]**2 + d1[:,1]**2 + eps)**1.5
-    return np.abs(num / (den + eps))
-
-def line_collision_free(p0, p1, occ, step=1.0):
-    if occ is None: return True
-    H, W = occ.shape
-    p0 = np.asarray(p0, np.float32)
-    p1 = np.asarray(p1, np.float32)
-    d = p1 - p0
-    L = float(np.linalg.norm(d)) + 1e-6
-    n = max(2, int(np.ceil(L/step)))
-    for a in np.linspace(0, 1, n):
-        x, y = p0 + a*d
-        xi = int(round(np.clip(x, 0, W-1)))
-        yi = int(round(np.clip(y, 0, H-1)))
-        if occ[yi, xi] != 0:
-            return False
-    return True
-
-def xy_to_xytheta(pts: np.ndarray, eps: float = 1e-6) -> np.ndarray:
-    pts = np.asarray(pts, dtype=np.float32)
-    T = pts.shape[0]
-    if T == 1:
-        return np.concatenate([pts, np.zeros((1,1), np.float32)], axis=1)
-    d = np.zeros_like(pts)
-    d[1:-1] = pts[2:] - pts[:-2]
-    d[0]    = pts[1]  - pts[0]
-    d[-1]   = pts[-1] - pts[-2]
-    theta = np.arctan2(d[:,1] + eps, d[:,0] + eps)
-    theta_unwrapped = np.unwrap(theta.astype(np.float64)).astype(np.float32)
-    return np.concatenate([pts, theta_unwrapped[:,None]], axis=1)
+from collections import defaultdict
+import re
 
 
 normalize_img = torchvision.transforms.Compose((
@@ -85,52 +41,41 @@ def img_transform(img, resize, resize_dims):
     post_tran[:2] = post_tran2
     post_rot[:2, :2] = post_rot2
     return img, post_rot, post_tran
-def apply_color_aug_rgb(img_rgb, p):
 
-    img = img_rgb.astype(np.float32)
+def drop_first_n_per_scene(path_list, n=5):
 
+    scene_dict = defaultdict(list)
 
-    mean = img.mean(axis=(0, 1), keepdims=True)
-    img = (img - mean) * p["contrast"] + mean
-    img = img * p["brightness"]
-    img = np.clip(img, 0, 255)
+    for p in path_list:
 
 
-    img[..., 0] *= p["r_gain"]
-    img[..., 1] *= p["g_gain"]
-    img[..., 2] *= p["b_gain"]
-    img = np.clip(img, 0, 255).astype(np.uint8)
+        scene_dir = os.path.dirname(os.path.dirname(p))
+        scene_dict[scene_dir].append(p)
 
+    filtered = []
+    for scene_dir in sorted(scene_dict.keys()):
+        imgs = sorted(scene_dict[scene_dir])
+        filtered.extend(imgs[n:])
 
-    hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HSV).astype(np.float32)
+    return filtered
 
-    hsv[..., 0] = (hsv[..., 0] + p["hue_shift"]) % 180
-    hsv[..., 1] = np.clip(hsv[..., 1] * p["sat_scale"], 0, 255)
-    hsv[..., 2] = np.clip(hsv[..., 2] * p["val_scale"], 0, 255)
-    img = cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2RGB)
+TOWNS = ["Town01", "Town02", "Town03", "Town04", "Town05"]
+TOWN_TO_IDX = {name: i for i, name in enumerate(TOWNS)}
 
+def parse_town_from_path(path):
 
-    if p["do_clahe"]:
-        lab = cv2.cvtColor(img, cv2.COLOR_RGB2LAB)
-        l, a, b = cv2.split(lab)
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-        l = clahe.apply(l)
-        lab = cv2.merge([l, a, b])
-        img = cv2.cvtColor(lab, cv2.COLOR_LAB2RGB)
-
-
-    gamma = p["gamma"]
-    if abs(gamma - 1.0) > 1e-3:
-        table = np.array([(i / 255.0) ** (1.0 / gamma) * 255 for i in range(256)]).astype("uint8")
-        img = cv2.LUT(img, table)
-
-    return img
-
+    m = re.search(r"(Town\d+)", path)
+    if m is None:
+        raise ValueError(f"Could not parse town from path: {path}")
+    town_name = m.group(1)
+    if town_name not in TOWN_TO_IDX:
+        raise ValueError(f"Unknown town: {town_name}")
+    return town_name, TOWN_TO_IDX[town_name]
 class Drive_Dataset(Dataset):
-    def __init__(self, train: bool,conf, seq_len=0, stride=1, ):
-        self.seq_len = seq_len
-        self.stride = stride
+    def __init__(self, train: bool,conf, v=1 ):
+        self.v=v
         self.train=train
+
         if train:
             self.image_front = sorted(
                 glob.glob('data/train/Town01/*/front_cam_rgb/*') +
@@ -147,7 +92,7 @@ class Drive_Dataset(Dataset):
                 glob.glob('data/val/Town04/*/front_cam_rgb/*') +
                 glob.glob('data/val/Town05/*/front_cam_rgb/*')
             )
-
+        self.image_front = drop_first_n_per_scene(self.image_front, n=5)
         with open('data/sensor_config.yaml', 'r') as f:
             cfg = yaml.safe_load(f)
         self.sensor_config = cfg['sensors']
@@ -160,28 +105,40 @@ class Drive_Dataset(Dataset):
         return len(self.image_front)
     def get_cam_para(self):
         def get_cam_to_ego(dof):
-            yaw = dof[5]
-            rotation = Quaternion(scalar=np.cos(yaw / 2), vector=[0, 0, np.sin(yaw / 2)])
+            yaw = np.deg2rad(dof[5])
+
+            rotation = Quaternion(
+                scalar=np.cos(yaw / 2),
+                vector=[0, 0, np.sin(yaw / 2)]
+            )
             rotation_matrix = rotation.rotation_matrix
 
             adapter_matrix = np.array([
                 [0, 0, 1],
-                [-1, 0, 0],
+                [1, 0, 0],
                 [0, -1, 0]
-            ])
+            ], dtype=np.float32)
 
             final_rotation = rotation_matrix @ adapter_matrix
 
-            translation = np.array(dof[:3])[:, None]
+
+            translation = np.array(dof[:3], dtype=np.float32)[:, None]
 
             cam_to_ego = np.vstack([
                 np.hstack((final_rotation, translation)),
-                np.array([0, 0, 0, 1])
-            ])
+                np.array([0, 0, 0, 1], dtype=np.float32)
+            ]).astype(np.float32)
 
             return cam_to_ego, final_rotation, translation
 
-        cam_names = ['left_cam', 'front_cam', 'right_cam', 'rear_left_cam','rear_cam', 'rear_right_cam']
+        cam_names = [
+            "right_cam",
+            "front_cam",
+            "left_cam",
+            "rear_right_cam",
+            "rear_cam",
+            "rear_left_cam",
+        ]
 
         extrinsic_list = []
         rotation_list = []
@@ -198,31 +155,38 @@ class Drive_Dataset(Dataset):
                 self.sensor_config[cam]['yaw'],
             ]
 
-
             cam_to_ego, final_rotation, translation = get_cam_to_ego(cam_dof)
 
-
-            extrinsic_list.append(torch.from_numpy(cam_to_ego).float().unsqueeze(0))
-            rotation_list.append(torch.from_numpy(final_rotation).float().unsqueeze(0))
-            translation_list.append(torch.from_numpy(translation).float().unsqueeze(0))
-
-            w = self.sensor_config[cam]['width']
-            h = self.sensor_config[cam]['height']
+            extrinsic_list.append(torch.from_numpy(cam_to_ego).float())
+            rotation_list.append(torch.from_numpy(final_rotation).float())
+            translation_list.append(torch.from_numpy(translation).float().squeeze(-1))
+            orig_w = self.sensor_config[cam]['width']
+            orig_h = self.sensor_config[cam]['height']
+            out_w = self.sensor_data['width']
+            out_h = self.sensor_data['height']
             fov = self.sensor_config[cam]['fov']
-            f = w / (2 * np.tan(fov * np.pi / 360))
-            Cu = w / 2
-            Cv = h / 2
+
+            sx = out_w / orig_w
+            sy = out_h / orig_h
+
+            f = orig_w / (2 * np.tan(np.deg2rad(fov) / 2))
+
+            fx = f * sx
+            fy = f * sy
+            Cu = (orig_w / 2) * sx
+            Cv = (orig_h / 2) * sy
+
             intrinsic = torch.tensor([
-                [f, 0, Cu],
-                [0, f, Cv],
-                [0, 0, 1]
-            ], dtype=torch.float32).unsqueeze(0)
+                [fx, 0,  Cu],
+                [0,  fy, Cv],
+                [0,  0,  1],
+            ], dtype=torch.float32)
             intrinsic_list.append(intrinsic)
 
-        extrinsic = torch.cat(extrinsic_list, dim=0)
-        rotation = torch.cat(rotation_list, dim=0)
-        translation = torch.cat(translation_list, dim=0).squeeze(-1)
-        intrinsic = torch.cat(intrinsic_list, dim=0)
+        extrinsic = torch.stack(extrinsic_list, dim=0)
+        intrinsic = torch.stack(intrinsic_list, dim=0)
+        rotation = torch.stack(rotation_list, dim=0)
+        translation = torch.stack(translation_list, dim=0)
 
         return extrinsic, intrinsic, rotation, translation
 
@@ -233,56 +197,43 @@ class Drive_Dataset(Dataset):
         resize_dims = (fW, fH)
         return resize, resize_dims
 
-    def sample_color_aug_params(self):
-        params = {
-            "brightness": random.uniform(0.85, 1.20),
-            "contrast":   random.uniform(0.85, 1.25),
-
-            "sat_scale":  random.uniform(0.80, 1.50),
-            "hue_shift":  random.uniform(-8, 8),
-            "val_scale":  random.uniform(0.90, 1.15),
-
-            "gamma":      random.uniform(0.85, 1.20),
-
-            "r_gain":     random.uniform(0.90, 1.10),
-            "g_gain":     random.uniform(0.90, 1.10),
-            "b_gain":     random.uniform(0.90, 1.10),
-
-            "do_clahe":   random.random() < 0.2,
-        }
-        return params
-
-
     def get_img(self, img_path):
-
         front_img_path = img_path.replace("front_cam_rgb", "front_cam_rgb")
         image_left_path = img_path.replace("front_cam_rgb", "left_cam_rgb")
         image_right_path = img_path.replace("front_cam_rgb", "right_cam_rgb")
-
         image_rear_path = img_path.replace("front_cam_rgb", "rear_cam_rgb")
         image_rear_left_path = img_path.replace("front_cam_rgb", "rear_left_cam_rgb")
         image_rear_right_path = img_path.replace("front_cam_rgb", "rear_right_cam_rgb")
         resize, resize_dims = self.sample_augmentation()
-        color_aug_params = self.sample_color_aug_params()
+
+
+        if self.train:
+            brightness = np.random.uniform(0.7, 1.3)
+            contrast = np.random.uniform(0.7, 1.3)
+            saturation = np.random.uniform(0.7, 1.3)
+            hue = np.random.uniform(-0.1, 0.1)
 
         imgs = []
         post_rots = []
         post_trans = []
-        for path in [image_left_path, front_img_path, image_right_path, image_rear_left_path, image_rear_path,image_rear_right_path]:
+        for path in [image_right_path, front_img_path, image_left_path,
+                    image_rear_right_path, image_rear_path, image_rear_left_path]:
             img = cv2.imread(path)
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             img, post_rot, post_tran = img_transform(img, resize, resize_dims)
+
             if self.train:
-                if img.dtype != np.uint8:
-                    img = np.clip(img, 0, 255).astype(np.uint8)
-                img = apply_color_aug_rgb(img, color_aug_params)
+                img_pil = T.ToPILImage()(img.astype(np.uint8))
+                img_pil = T.functional.adjust_brightness(img_pil, brightness)
+                img_pil = T.functional.adjust_contrast(img_pil, contrast)
+                img_pil = T.functional.adjust_saturation(img_pil, saturation)
+                img_pil = T.functional.adjust_hue(img_pil, hue)
+                img = np.array(img_pil)
 
             img = normalize_img(img)
-
             imgs.append(img)
             post_rots.append(post_rot)
             post_trans.append(post_tran)
-
 
         post_rots = torch.stack(post_rots)
         post_trans = torch.stack(post_trans)
@@ -290,40 +241,30 @@ class Drive_Dataset(Dataset):
         return imgs, post_rots, post_trans
 
     def get_bev(self, img_path):
-        bev_path=img_path.replace("front_cam_rgb", "das")
 
-        top = cv2.imread(bev_path)
-        das_mask = cv2.cvtColor(top, cv2.COLOR_BGR2GRAY)
-
-        vehicle_mask = cv2.imread(bev_path.replace('das', 'vehicle_mask'), cv2.IMREAD_GRAYSCALE)
-        route_mask = cv2.imread(bev_path.replace('das', 'road_network'), cv2.IMREAD_GRAYSCALE)
-        stopline_mask = cv2.imread(bev_path.replace('das', 'stopline'), cv2.IMREAD_GRAYSCALE)
-        walker_mask = cv2.imread(bev_path.replace('das', 'walker_mask'), cv2.IMREAD_GRAYSCALE)
-        lane_mask = cv2.imread(bev_path.replace('das', 'lane'), cv2.IMREAD_GRAYSCALE)
+        das_mask = cv2.imread(img_path.replace("front_cam_rgb", "das"), cv2.IMREAD_GRAYSCALE)
+        vehicle_mask = cv2.imread(img_path.replace('front_cam_rgb', 'vehicle_mask'), cv2.IMREAD_GRAYSCALE)
+        stopline_mask = cv2.imread(img_path.replace('front_cam_rgb', 'stopline'), cv2.IMREAD_GRAYSCALE)
+        walker_mask = cv2.imread(img_path.replace('front_cam_rgb', 'walker_mask'), cv2.IMREAD_GRAYSCALE)
+        lane_broken_mask = cv2.imread(img_path.replace('front_cam_rgb', 'lane_broken'), cv2.IMREAD_GRAYSCALE)
+        lane_solid_mask = cv2.imread(img_path.replace('front_cam_rgb', 'solid'), cv2.IMREAD_GRAYSCALE)
 
 
-        das_mask = (das_mask == 255).astype('uint8')*255
-        stopline_mask = (stopline_mask == 255).astype('uint8')*255
-        route_mask = (route_mask == 255).astype('uint8')*255
-        vehicle_mask = (vehicle_mask == 255).astype('uint8')*255
-        walker_mask = (walker_mask == 255).astype('uint8')*255
-        lane_mask = (lane_mask == 255).astype('uint8')*255
-
-
-        vehicle_mask = vehicle_mask[150:350, 150:350]
-        walker_mask = walker_mask[150:350, 150:350]
-
+        das_mask = (das_mask == 255).astype('uint8') * 255
+        stopline_mask = (stopline_mask == 255).astype('uint8') * 255
+        vehicle_mask = (vehicle_mask == 255).astype('uint8') * 255
+        walker_mask = (walker_mask == 255).astype('uint8') * 255
+        lane_broken_mask = (lane_broken_mask == 255).astype('uint8') * 255
+        lane_solid_mask = (lane_solid_mask == 255).astype('uint8') * 255
 
         das_mask = self.to_tensor(das_mask)
-        lane_mask = self.to_tensor(lane_mask)
+        lane_broken_mask = self.to_tensor(lane_broken_mask)
+        lane_solid_mask = self.to_tensor(lane_solid_mask)
         vehicle_mask = self.to_tensor(vehicle_mask)
         walker_mask = self.to_tensor(walker_mask)
-
         stopline_mask = self.to_tensor(stopline_mask)
-        route_mask = self.to_tensor(route_mask)
 
-        return das_mask, lane_mask, vehicle_mask, walker_mask,route_mask,stopline_mask
-
+        return das_mask, lane_broken_mask, lane_solid_mask, vehicle_mask, walker_mask, stopline_mask
 
     def get_lidar(self,img_path):
         path = img_path.replace("front_cam_rgb", "lidar").replace(".png", ".npy")
@@ -367,22 +308,32 @@ class Drive_Dataset(Dataset):
 
 
     def __getitem__(self, idx):
-        path=self.image_front[idx]
+        path = self.image_front[idx]
 
         bev_imgs, post_rots, post_trans = self.get_img(path)
 
-        lidar_data, lidar_mask,topview_img=self.get_lidar(path)
         extrinsic, intrinsic, rotation, translation = self.get_cam_para()
-        cam_pam={
-            'intrins':intrinsic,
-            'rots':rotation,
-            'trans':translation,
-            'post_rots':post_rots,
-            'post_trans':post_trans,
 
-            }
+        cam_pam = {
+            'intrins': intrinsic,
+            'rots': rotation,
+            'trans': translation,
+            'post_rots': post_rots,
+            'post_trans': post_trans,
+        }
 
-        das, lane, vehicle, walker, route_mask, stopline_mask = self.get_bev(path)
+        das, lane_broken,lane_solid, vehicle, walker, stopline_mask = self.get_bev(path)
 
+        town_name, town_idx = parse_town_from_path(path)
 
-        return bev_imgs,topview_img,cam_pam, lidar_data, lidar_mask,das, lane, vehicle, walker, stopline_mask,route_mask
+        return (
+            bev_imgs,
+            cam_pam,
+            das,
+            lane_broken,lane_solid,
+            vehicle,
+            walker,
+            stopline_mask,
+            torch.tensor(town_idx, dtype=torch.long),
+            town_name,
+        )

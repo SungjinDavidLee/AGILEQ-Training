@@ -15,15 +15,15 @@
 | `configs/internimage_t_1k_224.yaml` | 실제 사용하는 InternImage-T 설정 |
 | `ops/dcnv3/` | DCNv3 래퍼와 C++/CUDA 확장 |
 | `ops/deformable_attention/` | Deformable attention 래퍼와 C++/CUDA 확장 |
-| `data.py` | 참고용 기존 데이터로더; 새 train에서는 사용하지 않음 |
+| `data.py` | 6개 카메라, 6종 BEV 정답, 타운 정보를 반환하는 학습 데이터로더 |
 
 
-## 필요한 데이터 파일
+## 데이터셋
 
-**새 train이 사용하는 `data2.py`가 첨부에 없습니다. 이 파일을 추가하기 전에는 학습을 시작할 수 없습니다.** 필요한 호출 형식은 다음과 같습니다.
+제공된 데이터로더를 `data.py`로 반영했으며 train이 직접 불러옵니다.
 
 ```python
-from data2 import Drive_Dataset
+from data import Drive_Dataset
 
 train_set = Drive_Dataset(train=True, conf=conf, v=2)
 val_set = Drive_Dataset(train=False, conf=conf, v=2)
@@ -36,9 +36,13 @@ bev_imgs, cam_pam, road_gt, lane_broken_gt, lane_solid_gt,
 veh_gt, ped_gt, stop_gt, town_idx, town_name
 ```
 
-`cam_pam`은 `intrins`, `rots`, `trans`를 제공하고 영상 배치는 `[B,N,3,H,W]`입니다. 타운 인덱스는 train의 집계 순서인 `Town01`, `Town02`, `Town03`, `Town04`, `Town05`, `Town10HD`와 일치해야 합니다.
+`cam_pam`은 `intrins`, `rots`, `trans`를 제공하고 영상 배치는 `[B,N,3,H,W]`입니다. Train은 `data.py`의 `TOWNS`를 함께 불러오므로 `Town01`, `Town02`, `Town03`, `Town04`, `Town05`의 인덱스 순서를 공유합니다.
 
-기존 `data.py`는 생성자·반환 구조가 다르고 차선을 하나로 읽으므로 `data2.py` 대신 연결하지 않았습니다. 합쳐진 차선 mask만으로 점선·실선 정답을 임의로 나누지 않으며 실제 데이터 규약이 필요합니다.
+`data/train/Town01`~`Town05`, 대응되는 `data/val` 폴더와 `data/sensor_config.yaml`을 읽습니다. Scene별로 정렬된 첫 5개 파일을 제외합니다. 카메라 순서는 `right_cam`, `front_cam`, `left_cam`, `rear_right_cam`, `rear_cam`, `rear_left_cam`이며 영상 폴더는 `<camera>_rgb`입니다.
+
+BEV 정답 폴더는 `das`, `lane_broken`, `solid`, `vehicle_mask`, `walker_mask`, `stopline`입니다. 실선 폴더 이름은 `lane_solid`가 아닌 `solid`입니다. 값이 255인 흰색 픽셀을 정답으로 사용합니다. 학습에서는 6개 카메라에 같은 색상 증강을 적용하고 검증에는 적용하지 않습니다. 현재 샘플 경로는 `get_lidar()`를 호출하지 않으므로 LiDAR 파일은 필요하지 않습니다.
+
+점선·실선 정답은 별도로 준비해야 하며 수집기의 합쳐진 `lane` mask를 이 로더가 자동 분리하지 않습니다. 학습·검증 scene은 분리하세요.
 
 ## 환경
 
@@ -56,7 +60,7 @@ DCNv3에서 사용하는 `pkg_resources`를 제공하는 setuptools가 필요합
 
 ## 학습
 
-`data2.py`와 해당 데이터셋을 준비한 뒤 실행합니다.
+데이터셋과 실행 환경을 준비한 뒤 실행합니다.
 
 ```bash
 python train.py --wandb_mode disabled
@@ -86,7 +90,7 @@ road, lane_broken, lane_solid, vehicle, pedestrian, stopline = model(images, cam
 
 ## 검증
 
-Python 구문, 두 첨부 코드 대비 유지된 계산의 AST, 이동된 로컬 import 경로를 검사했습니다. 확인된 누락 의존성은 `data2.py`입니다. C++/CUDA 소스는 그대로 유지했고 CUDA 빌드와 전체 학습은 실행하지 않았습니다.
+Python 구문, 첨부 데이터로더의 주석·docstring 제거 전후 AST, 샘플 반환 10개 항목, train의 data import 및 타운 목록 공유를 확인했습니다. 모델·train 연결은 이전 작업에서 첨부 원본과 대조했습니다. 이번 작업에서 CUDA 빌드, 실제 데이터 로딩, 전체 학습은 실행하지 않았습니다.
 
 확장 연산 설치 후 기존 검사는 다음처럼 실행합니다.
 

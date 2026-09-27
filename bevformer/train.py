@@ -46,7 +46,7 @@ import tqdm
 import segmentation_models_pytorch as smp
 from torch.optim.lr_scheduler import LinearLR, CosineAnnealingLR, SequentialLR
 
-from data2 import Drive_Dataset
+from data import Drive_Dataset, TOWNS
 from configs import load_backbone_config
 from models import BEVFormer
 
@@ -669,7 +669,6 @@ def main():
             logger.info("VAL")
         model.eval()
 
-        TOWNS = ["Town01", "Town02", "Town03", "Town04", "Town05", "Town10HD"]
         NUM_TOWNS = len(TOWNS)
         val_loss_sum = 0.0
 

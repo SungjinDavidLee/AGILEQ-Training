@@ -1,0 +1,82 @@
+data_num: '10000'
+sensors:
+  front_cam:
+    depth: true
+    fov: 64.6
+    height: 300
+    od: false
+    pitch: 0.0
+    roll: 0.0
+    seg: true
+    width: 400
+    x: 1.7
+    y: 0.0
+    yaw: 0.0
+    z: 1.54
+  left_cam:
+    depth: true
+    fov: 64.6
+    height: 300
+    od: false
+    pitch: 0.0
+    roll: 0.0
+    seg: true
+    width: 400
+    x: 1.53
+    y: -0.78
+    yaw: -45.0
+    z: 1.52
+  rear_cam:
+    depth: true
+    fov: 64.6
+    height: 300
+    od: false
+    pitch: 0.0
+    roll: 0.0
+    seg: true
+    width: 400
+    x: -1.0
+    y: 0.0
+    yaw: 180.0
+    z: 1.54
+  rear_left_cam:
+    depth: true
+    fov: 64.6
+    height: 300
+    od: false
+    pitch: 0.0
+    roll: 0.0
+    seg: true
+    width: 400
+    x: -0.78
+    y: -0.78
+    yaw: -135.0
+    z: 1.51
+  rear_right_cam:
+    depth: true
+    fov: 64.6
+    height: 300
+    od: false
+    pitch: 0.0
+    roll: 0.0
+    seg: true
+    width: 400
+    x: -0.78
+    y: 0.78
+    yaw: 135.0
+    z: 1.51
+  right_cam:
+    depth: true
+    fov: 64.6
+    height: 300
+    od: false
+    pitch: 0.0
+    roll: 0.0
+    seg: true
+    width: 400
+    x: 1.53
+    y: 0.78
+    yaw: 45.0
+    z: 1.52
+towns:
+- Town05

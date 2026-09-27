@@ -12,25 +12,29 @@
 | `models_carla/` | 첨부된 다른 모델 변형 |
 | `models_carla/models/` | InternImage backbone 및 생성 함수 |
 | `models_carla/ops/` | Deformable attention Python 바인딩과 C++/CUDA 소스 |
+| `configs/` | InternImage 설정 생성 함수 및 YAML 프리셋 |
+| `ops_dcnv3/` | DCNv3 Python 바인딩, 설치 스크립트, C++/CUDA 소스 |
 
 ## 실행 준비
 
-첨부 소스만으로 바로 학습할 수 있는 구성은 아닙니다.
+설정과 DCNv3 소스가 포함되어 있습니다. 학습 전에 실행 환경을 준비해야 합니다.
 
-- `train.py`가 불러오는 `configs.config`의 `get_config_b`, `get_config_t`가 포함되어 있지 않습니다. 루트의 `config.py`는 다른 설정 코드입니다.
-- InternImage에서 사용하는 `ops_dcnv3`를 별도로 준비하고 빌드해야 합니다.
+- `train.py`가 불러오는 `get_config_b`, `get_config_t`는 `configs/config.py`에 있으며 B/T YAML 프리셋도 포함되어 있습니다. YAML 경로가 실행 디렉터리 기준이므로 `bevformer/`에서 실행하세요. 루트의 `config.py`는 다른 설정 코드입니다.
+- InternImage에서 사용하는 `ops_dcnv3`가 포함되어 있습니다. 네이티브 `DCNv3` 확장 연산은 대상 환경에서 빌드·설치해야 합니다.
 - CUDA에 의존하는 코드가 있으므로 PyTorch, torchvision, CUDA toolkit, 컴파일러 버전을 맞춰야 합니다. 완전한 실행 환경의 버전은 고정되어 있지 않습니다.
-- NumPy, OpenCV, PyYAML, pyquaternion, tqdm, segmentation-models-pytorch, efficientnet-pytorch, timm, wandb 등을 사용합니다. 다른 모델 변형은 추가 의존성이 있을 수 있습니다.
+- NumPy, OpenCV, PyYAML, yacs, pyquaternion, tqdm, segmentation-models-pytorch, efficientnet-pytorch, timm, wandb 등을 사용합니다. DCNv3 래퍼는 호환되는 setuptools의 `pkg_resources`도 사용합니다. 다른 모델 변형은 추가 의존성이 있을 수 있습니다.
 
-Python 3.9/Linux용 바이너리, object 파일, 빌드 메타데이터, egg, Python 캐시는 제외했습니다. 대상 환경에서 확장 연산을 빌드합니다.
+Python 3.7/3.9용 Linux 바이너리, object 파일, 빌드 메타데이터, egg, Python 캐시는 제외했습니다. 호환되는 PyTorch, CUDA, 컴파일러, setuptools, wheel을 준비한 뒤 `bevformer/`에서 두 확장 연산을 설치합니다.
 
 ```bash
-cd models_carla/ops
-python setup.py build_ext --inplace
-cd ../..
+python -m pip install yacs
+python -m pip install --no-build-isolation ./ops_dcnv3
+python -m pip install --no-build-isolation ./models_carla/ops
 ```
 
-누락된 설정과 의존성을 준비한 뒤 실행합니다.
+DCNv3 래퍼는 최상위 `DCNv3` 확장 모듈과 설치된 패키지 버전을 읽으므로 제자리 빌드만 하지 말고 설치해야 합니다. 제공된 빌드 스크립트는 사용 가능한 GPU와 CUDA toolkit이 있는 CUDA PyTorch 환경을 요구합니다.
+
+환경과 데이터를 준비한 뒤 실행합니다.
 
 ```bash
 python train.py --wandb_mode disabled
@@ -48,4 +52,4 @@ python train.py --wandb_mode disabled
 
 ## 검증
 
-Python 구문 검사와 주석·docstring 제거 전후의 실행 AST 동일성을 확인했습니다. CUDA 확장 빌드와 실제 학습은 수행하지 않았습니다. Python 저작권·라이선스 헤더는 `THIRD_PARTY_NOTICES.txt`에 보존했고 C++/CUDA 고지는 유지했습니다.
+추가된 설정·DCNv3 Python 소스까지 구문 검사와 주석·docstring 제거 전후의 실행 AST 동일성을 확인했습니다. 두 설정 생성 함수와 참조 YAML도 포함되어 있습니다. CUDA 확장 빌드와 실제 학습은 수행하지 않았습니다. Python 저작권·라이선스 헤더는 `THIRD_PARTY_NOTICES.txt`에 보존했고 C++/CUDA 고지는 유지했습니다.

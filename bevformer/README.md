@@ -12,25 +12,29 @@ Multi-camera BEV perception training source. The default training entry point im
 | `models_carla/` | Additional supplied model variants |
 | `models_carla/models/` | InternImage backbone and model builder |
 | `models_carla/ops/` | Multi-scale deformable-attention Python bindings and C++/CUDA source |
+| `configs/` | InternImage configuration factories and YAML presets |
+| `ops_dcnv3/` | DCNv3 Python bindings, installation script, and C++/CUDA source |
 
 ## Setup status
 
-This archive is not a self-contained runnable training package. In particular:
+The configuration and DCNv3 sources are included. Prepare the runtime environment before training:
 
-- `train.py` imports `get_config_b` and `get_config_t` from `configs.config`, which is not included. The root `config.py` is a different configuration file and is not a substitute.
-- The InternImage backbone imports `ops_dcnv3`, which must be supplied and built separately.
+- `train.py` imports `get_config_b` and `get_config_t` from the included `configs/config.py`. Their InternImage B/T YAML presets are in `configs/`. Run from `bevformer/` because these YAML paths are relative to the working directory. The root `config.py` is a different configuration file.
+- The InternImage backbone imports the included `ops_dcnv3` package. Its native `DCNv3` extension must be built and installed for your environment.
 - The default model includes CUDA-specific operations. Install mutually compatible PyTorch, torchvision, CUDA toolkit, and compiler versions. The archive does not pin a complete working environment.
-- Python dependencies include NumPy, OpenCV, PyYAML, pyquaternion, tqdm, segmentation-models-pytorch, efficientnet-pytorch, timm, and wandb. Some alternative modules require additional dependencies.
+- Python dependencies include NumPy, OpenCV, PyYAML, yacs, pyquaternion, tqdm, segmentation-models-pytorch, efficientnet-pytorch, timm, and wandb. The DCNv3 wrapper also uses `pkg_resources` from a compatible setuptools release. Some alternative modules require additional dependencies.
 
-Prebuilt Python 3.9 Linux extensions, object files, build metadata, eggs, and Python caches are excluded. Build the supplied deformable-attention extension in the target environment:
+Prebuilt Linux extensions for Python 3.7/3.9, object files, build metadata, eggs, and Python caches are excluded. After installing compatible PyTorch, CUDA, compiler, setuptools, and wheel dependencies, build and install both extensions from `bevformer/`:
 
 ```bash
-cd models_carla/ops
-python setup.py build_ext --inplace
-cd ../..
+python -m pip install yacs
+python -m pip install --no-build-isolation ./ops_dcnv3
+python -m pip install --no-build-isolation ./models_carla/ops
 ```
 
-After supplying the missing configuration and dependencies, the training entry point is:
+DCNv3 must be installed, not only compiled in place: the wrapper imports the top-level `DCNv3` extension and reads its installed package version. The supplied build scripts require a CUDA-enabled PyTorch environment with an available GPU and CUDA toolkit.
+
+After preparing the environment and dataset, the training entry point is:
 
 ```bash
 python train.py --wandb_mode disabled
@@ -50,4 +54,4 @@ Do not assume the `data_gen` output is already fully aligned with this archive. 
 
 ## Verification
 
-Python syntax and executable AST equivalence after comment/docstring removal were checked during repository preparation. CUDA extension builds and actual model training were not run. Original Python copyright and license headers are preserved in `THIRD_PARTY_NOTICES.txt`; C++/CUDA source notices remain in place.
+Python syntax and executable AST equivalence after comment/docstring removal were checked during repository preparation, including the added configuration and DCNv3 Python sources. Both configuration factories and their referenced YAML files are present. CUDA extension builds and actual model training were not run. Original Python copyright and license headers are preserved in `THIRD_PARTY_NOTICES.txt`; C++/CUDA source notices remain in place.

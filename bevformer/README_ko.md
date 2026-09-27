@@ -17,7 +17,6 @@
 | `ops/deformable_attention/` | Deformable attention 래퍼와 C++/CUDA 확장 |
 | `data.py` | 참고용 기존 데이터로더; 새 train에서는 사용하지 않음 |
 
-기존 `models_carla`, `ops_dcnv3` 경로와 다른 BEV 모델 변형·복사본, 관련 없는 신호등/RL 모델, 미사용 설정을 제거했습니다. 이전 버전은 Git 이력에서 확인할 수 있습니다.
 
 ## 필요한 데이터 파일
 

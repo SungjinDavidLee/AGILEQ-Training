@@ -17,8 +17,6 @@ One BEVFormer model and one training entry point, replaced with the latest suppl
 | `ops/deformable_attention/` | Deformable-attention wrappers and C++/CUDA extension |
 | `data.py` | Previous dataset loader, retained for reference; not used by the new trainer |
 
-The old `models_carla` and `ops_dcnv3` directories, alternative BEV models, duplicate model files, unrelated traffic/RL models, and unused configuration presets have been removed. Previous versions remain in Git history.
-
 ## Required dataset file
 
 **The new trainer requires `data2.py`, which was not included in the supplied files. Training cannot start until it is provided.** Its expected interface is:
